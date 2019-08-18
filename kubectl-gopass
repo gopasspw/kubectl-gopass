@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 function usage() {
   cat <<EOF
 
@@ -25,18 +27,16 @@ Usage:
 
 # kubectl gopass version
     prints out the kubectl-gopass version
-    
+
+# kubectl gopass help
+    prints these usage instructions
+
 EOF
 }
 
-if [[ "$1" == "version" ]]; then
-  echo "0.0.1"
-  exit 0
-fi
-
-if [[ "$1" == "apply" ]]; then
-  if [ "$#" -lt 2 ]; then
-    echo "Too few arguments, secret is required"
+diff_or_apply(){
+  if [[ "$#" -lt 2 ]]; then
+    echo >&2 "Too few arguments, secret is required"
     usage
     exit 1
   fi
@@ -45,16 +45,18 @@ if [[ "$1" == "apply" ]]; then
   KUBECTL_ARGS=("$@")
   unset "KUBECTL_ARGS[${#KUBECTL_ARGS[@]}-1]"
   unset "KUBECTL_ARGS[0]"
+  LEN_KUBECTL_ARGS=${#KUBECTL_ARGS[@]}
+  if [[ "$LEN_KUBECTL_ARGS" -lt 1 ]]; then
+    echo "will $1 secret $SECRET"
+  else
+    echo "will $1 secret $SECRET with additional kubectl args '" "${KUBECTL_ARGS[@]}" "'"
+  fi
+  $GOPASS show "$SECRET" | $KUBECTL "$1" ${KUBECTL_ARGS[@]+"${KUBECTL_ARGS[@]}"} -f -
+}
 
-  echo "will apply secret $SECRET with additional args '" "${KUBECTL_ARGS[@]}" "'"
-  gopass show "$SECRET" | kubectl apply "${KUBECTL_ARGS[@]}" -f -
-
-  exit 0
-fi
-
-if [[ "$1" == "apply-recursive" ]]; then
-  if [ "$#" -lt 2 ]; then
-    echo "Too few arguments, secret path is required"
+recursive() {
+  if [[ "$#" -lt 2 ]]; then
+    echo >&2 "Too few arguments, secret path is required"
     usage
     exit 1
   fi
@@ -67,47 +69,13 @@ if [[ "$1" == "apply-recursive" ]]; then
 
   IFS=$'\n'
   for SECRET in $(gopass ls -f "$SECRETPATH"); do
-    echo "will apply secret $SECRET with additional args '" "${KUBECTL_ARGS[@]}" "'"
-    gopass show "$SECRET" | kubectl apply "${KUBECTL_ARGS[@]}" -f -
+    diff_or_apply "$1" ${KUBECTL_ARGS[@]+"${KUBECTL_ARGS[@]}"} "$SECRET" || true
   done
-  exit 0
-fi
+}
 
-if [[ "$1" == "diff" ]]; then
-  if [ "$#" -lt 2 ]; then
-    echo "Too few arguments, secret is required"
-    usage
-    exit 1
-  fi
-  SECRET="${*: -1}"
-
-  KUBECTL_ARGS=("$@")
-  unset "KUBECTL_ARGS[${#KUBECTL_ARGS[@]}-1]"
-  unset "KUBECTL_ARGS[0]"
-
-  gopass show "$SECRET" | kubectl diff "${KUBECTL_ARGS[@]}" -f -
-  exit 0
-fi
-
-if [[ "$1" == "diff-recursive" ]]; then
-  if [ "$#" -lt 2 ]; then
-    echo "Too few arguments, secret path is required"
-    usage
-    exit 1
-  fi
-  SECRET="${*: -1}"
-
-  KUBECTL_ARGS=("$@")
-  unset "KUBECTL_ARGS[${#KUBECTL_ARGS[@]}-1]"
-  unset "KUBECTL_ARGS[0]"
-
-  gopass show "$SECRET" | kubectl diff "${KUBECTL_ARGS[@]}" -f -
-  exit 0
-fi
-
-if [[ "$1" == "create" ]]; then
-  if [ "$#" -lt 2 ]; then
-    echo "Too few arguments, target secret is required"
+create() {
+  if [[ "$#" -lt 1 ]]; then
+    echo >&2 "Too few arguments, target secret is required"
     usage
     exit 1
   fi
@@ -125,7 +93,62 @@ stringData:
 EOL
   gopass edit "$SECRETNAME"
   exit 0
-fi
+}
 
-usage
-exit 0
+main() {
+  if hash kubectl 2>/dev/null; then
+    KUBECTL=kubectl
+  elif hash kubectl.exe 2>/dev/null; then
+    KUBECTL=kubectl.exe
+  else
+    echo >&2 "kubectl is not installed"
+    exit 1
+  fi
+
+  if hash kubectl 2>/dev/null; then
+    GOPASS=gopass
+  elif hash kubectl.exe 2>/dev/null; then
+    GOPASS=gopass.exe
+  else
+    echo >&2 "gopass is not installed"
+    exit 1
+  fi
+
+  if [[ "$#" -eq 0 ]]; then
+    usage | less
+    return
+  fi
+
+  case "$1" in
+  '-h' | '--help' | 'help')
+    usage | less
+    ;;
+  'apply'|'diff')
+    diff_or_apply "${@:1}"
+    exit 0
+    ;;
+  'diff-recursive'| 'recursive-diff')
+    recursive "diff" "${@:2}"
+    ;;
+  'apply-recursive'| 'recursive-apply')
+    recursive "apply" "${@:2}"
+    ;;
+  'create')
+    create "${@:1}"
+    ;;
+  'version')
+    echo "0.0.2"
+    exit 0
+    ;;
+   -*)
+    usage
+    error "unrecognized flag \"${1}\""
+    ;;
+   *)
+    usage
+    error "unknown command \"$1\""
+  esac
+
+}
+
+main "$@"
