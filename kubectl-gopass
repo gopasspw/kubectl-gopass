@@ -18,7 +18,7 @@ Usage:
     shows the secret diff of "my-secret" via kubectl. Namespace and other 
     params can be specified and are passed through to kubectl.
 
-# kubectl gopass apply-recursive [optional kubectl apply params] my-secret-path
+# kubectl gopass diff-recursive [optional kubectl apply params] my-secret-path
     like diff but takes a path and applies all secrets below that path
     
 # kubectl gopass create my-new-secret
