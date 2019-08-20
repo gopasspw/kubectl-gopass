@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+VERSION='0.0.4'
+
 set -euo pipefail
 
 function usage() {
@@ -26,7 +28,7 @@ Usage:
     an editor to edit the newly created secret
 
 # kubectl gopass version
-    prints out the kubectl-gopass version
+    prints out the kubectl-gopass version ($VERSION)
 
 # kubectl gopass help
     prints these usage instructions
@@ -137,7 +139,7 @@ main() {
     create "${@:1}"
     ;;
   'version')
-    echo "0.0.2"
+    echo "$VERSION"
     exit 0
     ;;
    -*)
