@@ -5,7 +5,7 @@ A [plugin for kubectl](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-p
 ## Installation:
 
 Currently, you need to download the shell script, put it in your path and make it executable.
-It's also available via [krew](https://github.com/kubernetes-sigs/krew) is planned.
+It's also available via [krew](https://github.com/kubernetes-sigs/krew).
 
 Gopass and kubectl is required for all functionality, jq and yq are required for fetching secrets from kubernetes to gopass. 
 
